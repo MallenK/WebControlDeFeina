@@ -1,0 +1,5 @@
+{
+  "name": "Supabase Task Manager",
+  "description": "A comprehensive task and project management application featuring Kanban and List views, built with React, Tailwind CSS, and Supabase integration.",
+  "requestFramePermissions": []
+}

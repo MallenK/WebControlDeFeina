@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TaskFlow - Dashboard Pro</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 900: '#0c4a6e' }
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .snap-x-mandatory { scroll-snap-type: x mandatory; }
+        .snap-center { scroll-snap-align: center; }
+
+        .dragging { opacity: 0.5; transform: scale(0.98); border: 2px dashed #0ea5e9; }
+        .drag-over { background-color: #f0f9ff; border-color: #0ea5e9; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.95.3",
+    "react": "https://esm.sh/react@^19.2.4",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react/": "https://esm.sh/react@^19.2.4/"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex overflow-hidden">
+
+    <!-- OVERLAY MOVIL -->
+    <div id="overlay" onclick="window.app.ui.toggleSidebar()" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 hidden lg:hidden transition-opacity"></div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-40 w-72 bg-white border-r border-slate-200 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col shadow-2xl lg:shadow-none">
+        <!-- Logo -->
+        <div class="h-16 flex items-center justify-between px-6 border-b border-slate-100">
+            <div class="flex items-center gap-2.5 font-bold text-xl text-slate-800 tracking-tight cursor-pointer" onclick="window.app.router.goHome()">
+                <div class="bg-brand-600 text-white p-1.5 rounded-lg shadow-sm">
+                    <i data-lucide="layout-grid" class="w-5 h-5"></i>
+                </div>
+                TaskFlow
+            </div>
+            <button onclick="window.app.ui.toggleSidebar()" class="lg:hidden text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <!-- Navigation -->
+        <div class="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-6">
+            
+            <!-- Menu Principal -->
+            <div>
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider px-2">General</span>
+                <ul class="mt-2 space-y-1">
+                    <li onclick="window.app.router.goHome()" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium cursor-pointer text-slate-600 hover:bg-slate-50 hover:text-brand-600 transition-colors" id="nav-dashboard">
+                        <i data-lucide="home" class="w-4 h-4"></i> Dashboard
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Proyectos -->
+            <div>
+                <div class="flex justify-between items-center px-2 mb-2">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Proyectos</span>
+                    <button onclick="window.app.ui.openModal('modal-project')" class="p-1 text-slate-400 hover:text-brand-600 transition-colors"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                </div>
+                <ul id="project-list" class="space-y-1">
+                    <li class="px-4 py-4 text-center text-slate-400 text-xs animate-pulse">Cargando...</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- User Footer -->
+        <div class="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs">U</div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-slate-700 truncate">Usuario Demo</p>
+                <p class="text-xs text-slate-400">Plan Premium</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col min-w-0 bg-slate-50/50 relative">
+        
+        <!-- HEADER -->
+        <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-20 shadow-sm/50">
+            <div class="flex items-center gap-3">
+                <button onclick="window.app.ui.toggleSidebar()" class="lg:hidden p-2 -ml-2 text-slate-500 hover:bg-slate-100 rounded-lg"><i data-lucide="menu" class="w-5 h-5"></i></button>
+                <h2 id="header-title" class="text-lg font-bold text-slate-800 truncate">Dashboard</h2>
+                <button id="btn-edit-project" onclick="window.app.ui.openModal('modal-project', true)" class="hidden text-slate-400 hover:text-brand-600"><i data-lucide="settings-2" class="w-4 h-4"></i></button>
+            </div>
+
+            <div class="flex items-center gap-2 md:gap-4">
+                <!-- Search -->
+                <div class="relative hidden sm:block">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                    <input type="text" oninput="window.app.actions.handleSearch(this.value)" placeholder="Buscar..." class="pl-9 pr-4 py-1.5 bg-slate-100 border-none rounded-full text-sm focus:ring-2 focus:ring-brand-500 w-32 sm:w-48 transition-all">
+                </div>
+
+                <!-- Project View Switcher (Only visible in Project Mode) -->
+                <div id="view-switcher" class="hidden bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <button onclick="window.app.ui.switchProjectView('kanban')" id="btn-kanban" class="p-1.5 rounded bg-white text-brand-600 shadow-sm"><i data-lucide="kanban" class="w-4 h-4"></i></button>
+                    <button onclick="window.app.ui.switchProjectView('list')" id="btn-list" class="p-1.5 rounded text-slate-500 hover:bg-white/50"><i data-lucide="list" class="w-4 h-4"></i></button>
+                </div>
+
+                <!-- Add Task Button -->
+                <button onclick="window.app.ui.openModal('modal-task')" class="bg-brand-600 hover:bg-brand-700 text-white p-2 rounded-lg shadow-lg shadow-brand-500/20 active:scale-95 transition-all">
+                    <i data-lucide="plus" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- WORKSPACE (Dynamic Content) -->
+        <div id="workspace" class="flex-1 overflow-hidden relative p-4 sm:p-6 scroll-smooth">
+            <!-- Content Injected by JS -->
+        </div>
+    </main>
+
+    <!-- MODAL: PROYECTO -->
+    <div id="modal-project" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="window.app.ui.closeModal('modal-project')"></div>
+        <div class="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl animate-fade-in overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-slate-800" id="project-modal-title">Nuevo Proyecto</h3>
+                <button onclick="window.app.ui.closeModal('modal-project')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form onsubmit="window.app.actions.saveProject(event)" class="p-6 space-y-4">
+                <input type="hidden" name="id" id="p-id">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre</label>
+                    <input type="text" name="nombre" id="p-nombre" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm font-medium">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Descripción</label>
+                    <textarea name="descripcion" id="p-desc" rows="3" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-brand-500 outline-none text-sm resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Color</label>
+                    <div class="flex items-center gap-3">
+                        <input type="color" name="color_hex" id="p-color" value="#0ea5e9" class="h-10 w-16 p-0 border-0 rounded cursor-pointer">
+                    </div>
+                </div>
+                <div class="pt-2 flex gap-3">
+                    <button type="button" onclick="window.app.actions.deleteProject()" id="btn-delete-project" class="hidden px-4 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm font-medium">Eliminar</button>
+                    <div class="flex-1"></div>
+                    <button type="button" onclick="window.app.ui.closeModal('modal-project')" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-medium">Cancelar</button>
+                    <button type="submit" class="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium shadow-md">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: TAREA (PREMIUM LAYOUT) -->
+    <div id="modal-task" class="fixed inset-0 z-50 hidden flex items-end sm:items-center justify-center sm:p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="window.app.ui.closeModal('modal-task')"></div>
+        <div class="relative bg-white w-full h-[95vh] sm:h-[85vh] sm:max-w-4xl rounded-t-2xl sm:rounded-2xl shadow-2xl animate-fade-in flex flex-col sm:flex-row overflow-hidden">
+            
+            <!-- Left Column: Metadata -->
+            <div class="w-full sm:w-80 bg-slate-50 border-r border-slate-100 flex flex-col flex-shrink-0">
+                <div class="p-5 border-b border-slate-100">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Configuración</h3>
+                </div>
+                <form id="form-task-meta" class="p-5 space-y-6 flex-1 overflow-y-auto custom-scrollbar">
+                    <input type="hidden" name="id" id="t-id">
+                    
+                    <!-- Project Selector -->
+                    <div id="task-project-select-container" class="hidden">
+                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Proyecto</label>
+                         <select id="t-project-id" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none"></select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Estado</label>
+                        <select id="t-estado" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-brand-500 outline-none">
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="En curso">En curso</option>
+                            <option value="Completada">Completada</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Prioridad</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="prioridad" value="Baja" class="peer hidden">
+                                <div class="text-center text-xs py-2 border rounded-lg peer-checked:bg-blue-50 peer-checked:text-blue-600 peer-checked:border-blue-200 text-slate-500 hover:bg-white transition-all">Baja</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="prioridad" value="Media" class="peer hidden">
+                                <div class="text-center text-xs py-2 border rounded-lg peer-checked:bg-amber-50 peer-checked:text-amber-600 peer-checked:border-amber-200 text-slate-500 hover:bg-white transition-all">Media</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="prioridad" value="Alta" class="peer hidden">
+                                <div class="text-center text-xs py-2 border rounded-lg peer-checked:bg-red-50 peer-checked:text-red-600 peer-checked:border-red-200 text-slate-500 hover:bg-white transition-all">Alta</div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Fecha Límite</label>
+                        <input type="date" id="t-fecha" class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 focus:border-brand-500 outline-none">
+                    </div>
+
+                    <div class="pt-6 mt-auto">
+                        <button type="button" onclick="window.app.actions.deleteTask()" id="btn-delete-task" class="w-full flex items-center justify-center gap-2 text-red-500 hover:bg-red-50 py-2.5 rounded-lg text-xs font-bold uppercase transition-colors hidden border border-transparent hover:border-red-100">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i> Eliminar
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Right Column: Content Editor -->
+            <div class="flex-1 flex flex-col bg-white min-h-[400px]">
+                <div class="p-5 border-b border-slate-100 flex justify-between items-start gap-4">
+                    <div class="flex-1">
+                        <input type="text" id="t-titulo" placeholder="Título de la tarea" class="w-full text-xl font-bold text-slate-800 placeholder-slate-300 border-none p-0 focus:ring-0 bg-transparent mb-1">
+                        <input type="text" id="t-desc" placeholder="Añadir una descripción breve..." class="w-full text-sm text-slate-500 placeholder-slate-300 border-none p-0 focus:ring-0 bg-transparent">
+                    </div>
+                    <button onclick="window.app.ui.closeModal('modal-task')" class="text-slate-400 hover:bg-slate-50 p-1 rounded-full"><i data-lucide="x" class="w-6 h-6"></i></button>
+                </div>
+                
+                <div class="flex-1 p-5 flex flex-col bg-slate-50/30">
+                    <label class="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                        <i data-lucide="file-text" class="w-4 h-4 text-brand-500"></i> Documento / Detalles
+                    </label>
+                    <textarea id="t-doc" class="flex-1 w-full bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-700 leading-relaxed focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all resize-none shadow-sm whitespace-pre-wrap font-mono" placeholder="Escribe aquí especificaciones técnicas, notas de reunión o contenido extenso..."></textarea>
+                </div>
+
+                <div class="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
+                    <button onclick="window.app.ui.closeModal('modal-task')" class="px-5 py-2.5 text-slate-500 hover:text-slate-700 font-medium text-sm">Cancelar</button>
+                    <button onclick="window.app.actions.saveTask()" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium text-sm shadow-lg shadow-brand-500/20 active:scale-95 transition-all">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIC -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // --- CONFIGURATION ---
+            const SUPABASE_URL = 'https://ghxntlwocdqacybrspsd.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoeG50bHdvY2RxYWN5YnJzcHNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NjM5NTYsImV4cCI6MjA3NzEzOTk1Nn0.IlCuajufM4VJ2-BkVwdJvxRqJDBHkaST_EmSWoC4Da8';
+            const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+            // --- APP STATE ---
+            const state = {
+                currentView: 'dashboard', 
+                activeProjectId: null,
+                projectMode: 'kanban',
+                projects: [],
+                allTasks: [],
+                filterTerm: '',
+                // New Dashboard Filters
+                dashboardFilters: {
+                    projectId: '', // Empty means 'All'
+                    status: '',    // Empty means 'All'
+                    priority: ''   // Empty means 'All'
+                }
+            };
+
+            // --- GLOBAL NAMESPACE ---
+            window.app = {
+                
+                // 1. ROUTER & NAVIGATION
+                router: {
+                    goHome: () => {
+                        state.currentView = 'dashboard';
+                        state.activeProjectId = null;
+                        state.filterTerm = ''; 
+                        // Reset filters on home navigation? optional. Let's keep them for persistence feeling.
+                        window.app.render.sidebar();
+                        window.app.render.dashboard();
+                    },
+                    goToProject: (id) => {
+                        state.currentView = 'project';
+                        state.activeProjectId = id;
+                        state.filterTerm = '';
+                        window.app.render.sidebar();
+                        window.app.render.projectWorkspace();
+                    }
+                },
+
+                // 2. UI HELPERS
+                ui: {
+                    toggleSidebar: () => {
+                        const sb = document.getElementById('sidebar');
+                        const ov = document.getElementById('overlay');
+                        const isClosed = sb.classList.contains('-translate-x-full');
+                        sb.classList.toggle('-translate-x-full', !isClosed);
+                        ov.classList.toggle('hidden', !isClosed);
+                    },
+                    switchProjectView: (mode) => {
+                        state.projectMode = mode;
+                        window.app.render.projectWorkspace();
+                    },
+                    openModal: (id, isEdit = false) => {
+                        document.getElementById(id).classList.remove('hidden');
+                        if(id === 'modal-project') window.app.actions.prepProjectModal(isEdit);
+                        if(id === 'modal-task' && !isEdit) window.app.actions.prepTaskModal(null); 
+                    },
+                    closeModal: (id) => document.getElementById(id).classList.add('hidden'),
+                    formatDate: (d) => d ? d.split('-').reverse().slice(0,2).join('/') : '',
+                    isOverdue: (d, s) => d && new Date(d) < new Date().setHours(0,0,0,0) && s !== 'Completada'
+                },
+
+                // 3. RENDER ENGINE
+                render: {
+                    sidebar: () => {
+                        const list = document.getElementById('project-list');
+                        list.innerHTML = '';
+                        state.projects.forEach(p => {
+                            const isActive = state.activeProjectId === p.id;
+                            const li = document.createElement('li');
+                            li.className = `group flex items-center gap-3 px-3 py-2 rounded-lg text-sm cursor-pointer mx-2 transition-all ${isActive ? 'bg-brand-50 text-brand-700 font-medium border border-brand-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`;
+                            li.onclick = () => window.app.router.goToProject(p.id);
+                            li.innerHTML = `<div class="w-2.5 h-2.5 rounded-full" style="background-color: ${p.color_hex || '#cbd5e1'}"></div>
+                                            <span class="truncate flex-1">${p.nombre}</span>
+                                            ${isActive ? '<i data-lucide="chevron-right" class="w-4 h-4 text-brand-400"></i>' : ''}`;
+                            list.appendChild(li);
+                        });
+                        
+                        // Highlight Dashboard Link
+                        const dashLink = document.getElementById('nav-dashboard');
+                        if(state.currentView === 'dashboard') {
+                            dashLink.classList.add('bg-slate-100', 'text-brand-600');
+                        } else {
+                            dashLink.classList.remove('bg-slate-100', 'text-brand-600');
+                        }
+                        lucide.createIcons();
+                    },
+
+                    dashboard: () => {
+                        const ws = document.getElementById('workspace');
+                        document.getElementById('header-title').textContent = 'Dashboard General';
+                        document.getElementById('view-switcher').classList.add('hidden');
+                        document.getElementById('btn-edit-project').classList.add('hidden');
+
+                        // --- 1. Filter Logic ---
+                        let filteredTasks = state.allTasks;
+
+                        // Search Term
+                        if(state.filterTerm) {
+                            const term = state.filterTerm.toLowerCase();
+                            filteredTasks = filteredTasks.filter(t => 
+                                t.titulo.toLowerCase().includes(term) || 
+                                (t.contenido_doc && t.contenido_doc.toLowerCase().includes(term))
+                            );
+                        }
+                        // Project Filter
+                        if(state.dashboardFilters.projectId) {
+                            filteredTasks = filteredTasks.filter(t => t.proyecto_id == state.dashboardFilters.projectId);
+                        }
+                        // Status Filter
+                        if(state.dashboardFilters.status) {
+                            filteredTasks = filteredTasks.filter(t => t.estado === state.dashboardFilters.status);
+                        }
+                        // Priority Filter
+                        if(state.dashboardFilters.priority) {
+                            filteredTasks = filteredTasks.filter(t => t.prioridad === state.dashboardFilters.priority);
+                        }
+
+                        // --- 2. Calc Stats based on FILTERED view ---
+                        const total = filteredTasks.length;
+                        const pending = filteredTasks.filter(t => t.estado === 'Pendiente').length;
+                        const completed = filteredTasks.filter(t => t.estado === 'Completada').length;
+                        const overdue = filteredTasks.filter(t => window.app.ui.isOverdue(t.fecha_limite, t.estado)).length;
+
+                        // --- 3. Render HTML ---
+                        // Project Options
+                        const projectOptions = state.projects.map(p => 
+                            `<option value="${p.id}" ${state.dashboardFilters.projectId == p.id ? 'selected' : ''}>${p.nombre}</option>`
+                        ).join('');
+
+                        ws.innerHTML = `
+                            <div class="max-w-6xl mx-auto space-y-6 animate-fade-in">
+                                
+                                <!-- SMART FILTERS BAR -->
+                                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
+                                    <div class="flex items-center gap-2 text-slate-500 font-medium text-sm">
+                                        <i data-lucide="filter" class="w-4 h-4"></i> Filtros:
+                                    </div>
+                                    <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-1 justify-end">
+                                        
+                                        <select onchange="window.app.actions.updateDashboardFilter('projectId', this.value)" class="bg-slate-50 border border-slate-200 text-slate-600 text-sm rounded-lg focus:ring-brand-500 focus:border-brand-500 block p-2 outline-none">
+                                            <option value="">Todos los Proyectos</option>
+                                            ${projectOptions}
+                                        </select>
+
+                                        <select onchange="window.app.actions.updateDashboardFilter('status', this.value)" class="bg-slate-50 border border-slate-200 text-slate-600 text-sm rounded-lg focus:ring-brand-500 focus:border-brand-500 block p-2 outline-none">
+                                            <option value="">Cualquier Estado</option>
+                                            <option value="Pendiente" ${state.dashboardFilters.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                                            <option value="En curso" ${state.dashboardFilters.status === 'En curso' ? 'selected' : ''}>En curso</option>
+                                            <option value="Completada" ${state.dashboardFilters.status === 'Completada' ? 'selected' : ''}>Completada</option>
+                                        </select>
+
+                                        <select onchange="window.app.actions.updateDashboardFilter('priority', this.value)" class="bg-slate-50 border border-slate-200 text-slate-600 text-sm rounded-lg focus:ring-brand-500 focus:border-brand-500 block p-2 outline-none">
+                                            <option value="">Cualquier Prioridad</option>
+                                            <option value="Alta" ${state.dashboardFilters.priority === 'Alta' ? 'selected' : ''}>Alta</option>
+                                            <option value="Media" ${state.dashboardFilters.priority === 'Media' ? 'selected' : ''}>Media</option>
+                                            <option value="Baja" ${state.dashboardFilters.priority === 'Baja' ? 'selected' : ''}>Baja</option>
+                                        </select>
+
+                                        ${ (state.dashboardFilters.projectId || state.dashboardFilters.status || state.dashboardFilters.priority || state.filterTerm) ? 
+                                            `<button onclick="window.app.actions.clearFilters()" class="text-red-500 text-xs font-bold hover:underline px-2">Limpiar</button>` 
+                                            : '' 
+                                        }
+                                    </div>
+                                </div>
+
+                                <!-- KPI Cards (Reactive) -->
+                                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                    ${window.app.render.kpiCard('Total', total, 'layers', 'bg-blue-50 text-blue-600')}
+                                    ${window.app.render.kpiCard('Pendientes', pending, 'clock', 'bg-amber-50 text-amber-600')}
+                                    ${window.app.render.kpiCard('Completadas', completed, 'check-circle', 'bg-green-50 text-green-600')}
+                                    ${window.app.render.kpiCard('Vencidas', overdue, 'alert-triangle', 'bg-red-50 text-red-600')}
+                                </div>
+
+                                <!-- Table Section -->
+                                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                    <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                                        <h3 class="font-bold text-slate-700">Listado de Tareas</h3>
+                                        <span class="text-xs text-slate-400 font-mono">${filteredTasks.length} resultados</span>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-sm text-left">
+                                            <thead class="text-xs text-slate-400 uppercase bg-slate-50 border-b border-slate-100">
+                                                <tr>
+                                                    <th class="px-6 py-3">Tarea</th>
+                                                    <th class="px-6 py-3">Proyecto</th>
+                                                    <th class="px-6 py-3">Estado</th>
+                                                    <th class="px-6 py-3">Prioridad</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-100">
+                                                ${filteredTasks.length ? filteredTasks.map(t => window.app.render.tableRow(t)).join('') : '<tr><td colspan="4" class="px-6 py-12 text-center text-slate-400 flex flex-col items-center gap-2"><i data-lucide="filter-x" class="w-8 h-8 opacity-50"></i><span>No coinciden tareas con los filtros actuales</span></td></tr>'}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        lucide.createIcons();
+                    },
+
+                    projectWorkspace: () => {
+                        const ws = document.getElementById('workspace');
+                        const project = state.projects.find(p => p.id === state.activeProjectId);
+                        if(!project) return;
+
+                        document.getElementById('header-title').textContent = project.nombre;
+                        document.getElementById('view-switcher').classList.remove('hidden');
+                        document.getElementById('btn-edit-project').classList.remove('hidden');
+                        
+                        // Toggle buttons style
+                        const btnK = document.getElementById('btn-kanban');
+                        const btnL = document.getElementById('btn-list');
+                        if(state.projectMode === 'kanban') {
+                            btnK.classList.add('bg-white', 'text-brand-600', 'shadow-sm'); btnK.classList.remove('text-slate-500');
+                            btnL.classList.remove('bg-white', 'text-brand-600', 'shadow-sm'); btnL.classList.add('text-slate-500');
+                        } else {
+                            btnL.classList.add('bg-white', 'text-brand-600', 'shadow-sm'); btnL.classList.remove('text-slate-500');
+                            btnK.classList.remove('bg-white', 'text-brand-600', 'shadow-sm'); btnK.classList.add('text-slate-500');
+                        }
+
+                        // Filter tasks for this project
+                        let tasks = state.allTasks.filter(t => t.proyecto_id === project.id);
+                        if(state.filterTerm) {
+                            tasks = tasks.filter(t => t.titulo.toLowerCase().includes(state.filterTerm) || (t.contenido_doc && t.contenido_doc.toLowerCase().includes(state.filterTerm)));
+                        }
+
+                        ws.innerHTML = `<div class="h-full animate-fade-in">${state.projectMode === 'kanban' ? window.app.render.kanban(tasks) : window.app.render.list(tasks)}</div>`;
+                        lucide.createIcons();
+                    },
+
+                    // Sub-render helpers
+                    kpiCard: (title, val, icon, colorClass) => `
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
+                            <div class="p-3 rounded-xl ${colorClass}"><i data-lucide="${icon}" class="w-6 h-6"></i></div>
+                            <div>
+                                <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">${title}</p>
+                                <p class="text-2xl font-bold text-slate-800">${val}</p>
+                            </div>
+                        </div>`,
+
+                    tableRow: (t) => {
+                        const pName = state.projects.find(p => p.id === t.proyecto_id)?.nombre || 'Desconocido';
+                        const prioColor = t.prioridad === 'Alta' ? 'text-red-600 bg-red-50' : t.prioridad === 'Media' ? 'text-amber-600 bg-amber-50' : 'text-blue-600 bg-blue-50';
+                        const isOverdue = window.app.ui.isOverdue(t.fecha_limite, t.estado);
+                        return `
+                        <tr class="hover:bg-slate-50 cursor-pointer transition-colors group" onclick="window.app.actions.openTaskModal('${t.id}')">
+                            <td class="px-6 py-4 font-medium text-slate-800 group-hover:text-brand-600 transition-colors">
+                                ${t.titulo}
+                                ${isOverdue ? '<span class="ml-2 inline-flex items-center text-[10px] text-red-500 font-bold bg-red-50 px-1.5 py-0.5 rounded border border-red-100">VENCIDA</span>' : ''}
+                            </td>
+                            <td class="px-6 py-4 text-slate-500"><span class="bg-slate-100 px-2 py-1 rounded text-xs border border-slate-200">${pName}</span></td>
+                            <td class="px-6 py-4"><span class="text-xs font-bold px-2 py-1 rounded-full border border-slate-200 ${t.estado==='Completada'?'bg-green-100 text-green-700':t.estado==='En curso'?'bg-brand-100 text-brand-700':'bg-slate-100 text-slate-500'}">${t.estado}</span></td>
+                            <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs font-bold ${prioColor}">${t.prioridad}</span></td>
+                        </tr>`;
+                    },
+
+                    kanban: (tasks) => {
+                        const cols = ['Pendiente', 'En curso', 'Completada'];
+                        let html = `<div class="flex flex-row overflow-x-auto snap-x-mandatory lg:grid lg:grid-cols-3 gap-6 h-full pb-4">`;
+                        
+                        cols.forEach(status => {
+                            const items = tasks.filter(t => t.estado === status);
+                            html += `
+                            <div class="flex flex-col min-w-[85vw] sm:min-w-0 h-full bg-slate-100/70 rounded-2xl border border-slate-200 snap-center"
+                                 ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                                 ondragleave="this.classList.remove('drag-over')"
+                                 ondrop="window.app.actions.dropTask(event, '${status}')">
+                                <div class="p-4 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-slate-50/90 backdrop-blur-sm z-10 rounded-t-2xl">
+                                    <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                                        <div class="w-2 h-2 rounded-full ${status==='Pendiente'?'bg-slate-400':status==='En curso'?'bg-brand-500':'bg-green-500'}"></div> ${status}
+                                    </h3>
+                                    <span class="bg-white text-slate-400 text-xs font-bold px-2 py-0.5 rounded-md shadow-sm border border-slate-100">${items.length}</span>
+                                </div>
+                                <div class="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
+                                    ${items.map(t => window.app.render.taskCard(t)).join('')}
+                                </div>
+                            </div>`;
+                        });
+                        return html + `</div>`;
+                    },
+
+                    list: (tasks) => {
+                        if(!tasks.length) return `<div class="text-center py-12 text-slate-400">No hay tareas aquí.</div>`;
+                        return `<div class="max-w-4xl mx-auto space-y-2 pb-20">
+                            ${tasks.map(t => {
+                                const isOverdue = window.app.ui.isOverdue(t.fecha_limite, t.estado);
+                                const statusColor = t.estado==='Completada'?'bg-green-100 text-green-600':t.estado==='En curso'?'bg-brand-100 text-brand-600':'bg-slate-100 text-slate-600';
+                                return `
+                                <div onclick="window.app.actions.openTaskModal('${t.id}')" class="group flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl hover:border-brand-300 shadow-sm cursor-pointer transition-all">
+                                    <div class="w-1 h-10 rounded-full ${t.prioridad==='Alta'?'bg-red-400':t.prioridad==='Media'?'bg-amber-400':'bg-blue-400'}"></div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <h4 class="font-bold text-slate-800 truncate text-sm ${t.estado==='Completada'?'line-through text-slate-400':''}">${t.titulo}</h4>
+                                            ${t.contenido_doc ? '<i data-lucide="file-text" class="w-3.5 h-3.5 text-brand-500"></i>' : ''}
+                                        </div>
+                                        <div class="flex items-center gap-3 text-xs text-slate-500">
+                                            <span class="px-2 py-0.5 rounded border border-transparent ${statusColor} font-bold">${t.estado}</span>
+                                            ${t.fecha_limite ? `<span class="flex items-center gap-1 ${isOverdue?'text-red-500 font-bold':''}"><i data-lucide="calendar" class="w-3 h-3"></i> ${window.app.ui.formatDate(t.fecha_limite)}</span>` : ''}
+                                        </div>
+                                    </div>
+                                    <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 group-hover:text-brand-400"></i>
+                                </div>`
+                            }).join('')}
+                        </div>`;
+                    },
+
+                    taskCard: (t) => {
+                        const isOverdue = window.app.ui.isOverdue(t.fecha_limite, t.estado);
+                        const prioColor = t.prioridad === 'Alta' ? 'bg-red-50 text-red-600 border-red-100' : t.prioridad === 'Media' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-blue-50 text-blue-600 border-blue-100';
+                        return `
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 hover:shadow-md hover:border-brand-300 transition-all cursor-pointer group active:scale-[0.98]"
+                             draggable="true"
+                             ondragstart="event.dataTransfer.setData('text', '${t.id}'); this.classList.add('dragging')"
+                             ondragend="this.classList.remove('dragging')"
+                             onclick="window.app.actions.openTaskModal('${t.id}')">
+                            <div class="flex justify-between items-start mb-2">
+                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border ${prioColor}">${t.prioridad}</span>
+                                ${t.contenido_doc ? '<i data-lucide="file-text" class="w-3.5 h-3.5 text-brand-500"></i>' : ''}
+                            </div>
+                            <h4 class="font-semibold text-sm text-slate-800 mb-1 leading-snug ${t.estado === 'Completada' ? 'line-through text-slate-400' : ''}">${t.titulo}</h4>
+                            <div class="flex items-center justify-between border-t border-slate-50 pt-2 mt-3">
+                                ${t.fecha_limite ? `<div class="flex items-center gap-1 text-xs ${isOverdue ? 'text-red-600 font-bold' : 'text-slate-400'}"><i data-lucide="${isOverdue?'alert-circle':'calendar'}" class="w-3 h-3"></i> ${window.app.ui.formatDate(t.fecha_limite)}</div>` : '<span></span>'}
+                                <div class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">${t.titulo.charAt(0)}</div>
+                            </div>
+                        </div>`;
+                    }
+                },
+
+                // 4. DATA ACTIONS
+                actions: {
+                    init: async () => {
+                        // Fetch initial data
+                        const [pRes, tRes] = await Promise.all([
+                            db.from('proyectos').select('*').order('nombre'),
+                            db.from('tareas').select('*')
+                        ]);
+
+                        state.projects = pRes.data || [];
+                        state.allTasks = tRes.data || [];
+
+                        window.app.router.goHome(); // Start at Dashboard
+                    },
+
+                    handleSearch: (term) => {
+                        state.filterTerm = term.toLowerCase();
+                        if(state.currentView === 'dashboard') window.app.render.dashboard();
+                        else window.app.render.projectWorkspace();
+                    },
+
+                    // New: Dashboard Filters Handler
+                    updateDashboardFilter: (key, value) => {
+                        state.dashboardFilters[key] = value;
+                        window.app.render.dashboard();
+                    },
+
+                    clearFilters: () => {
+                        state.dashboardFilters = { projectId: '', status: '', priority: '' };
+                        state.filterTerm = '';
+                        // Also clear search input
+                        const searchInput = document.querySelector('input[placeholder="Buscar..."]');
+                        if(searchInput) searchInput.value = '';
+                        window.app.render.dashboard();
+                    },
+
+                    // Task Modal Logic
+                    prepTaskModal: (task) => {
+                        // Reset & Show Correct Inputs
+                        const projSelect = document.getElementById('task-project-select-container');
+                        const projSelectEl = document.getElementById('t-project-id');
+                        const delBtn = document.getElementById('btn-delete-task');
+                        
+                        // Populate Project Select if needed
+                        projSelectEl.innerHTML = state.projects.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+                        
+                        if(state.currentView === 'dashboard' && !task) {
+                            projSelect.classList.remove('hidden'); // Need to choose project
+                            if(state.projects.length) projSelectEl.value = state.projects[0].id;
+                        } else {
+                            projSelect.classList.add('hidden'); // Implicit or editing
+                        }
+
+                        if(task) {
+                            document.getElementById('t-id').value = task.id;
+                            document.getElementById('t-titulo').value = task.titulo;
+                            document.getElementById('t-desc').value = task.descripcion || '';
+                            document.getElementById('t-doc').value = task.contenido_doc || '';
+                            document.getElementById('t-estado').value = task.estado;
+                            document.getElementById('t-fecha').value = task.fecha_limite || '';
+                            document.getElementById('t-project-id').value = task.proyecto_id;
+                            
+                            // Radio
+                            document.querySelectorAll('input[name="prioridad"]').forEach(r => r.checked = r.value === task.prioridad);
+                            delBtn.classList.remove('hidden');
+                        } else {
+                            // New
+                            document.getElementById('t-id').value = '';
+                            document.getElementById('t-titulo').value = '';
+                            document.getElementById('t-desc').value = '';
+                            document.getElementById('t-doc').value = '';
+                            document.getElementById('t-estado').value = 'Pendiente';
+                            document.getElementById('t-fecha').value = '';
+                            document.querySelectorAll('input[name="prioridad"]')[1].checked = true; // Medium default
+                            delBtn.classList.add('hidden');
+                            
+                            if(state.currentView === 'project') projSelectEl.value = state.activeProjectId;
+                        }
+                    },
+
+                    openTaskModal: (id) => {
+                        const task = state.allTasks.find(t => t.id == id);
+                        window.app.ui.openModal('modal-task', true);
+                        window.app.actions.prepTaskModal(task);
+                    },
+
+                    saveTask: async () => {
+                        const id = document.getElementById('t-id').value;
+                        const titulo = document.getElementById('t-titulo').value;
+                        if(!titulo) return alert('El título es obligatorio');
+
+                        const projectIdVal = document.getElementById('t-project-id').value;
+                        // If implicit project mode, use active, else use selected
+                        const finalProjId = (state.currentView === 'project' && !id) ? state.activeProjectId : projectIdVal;
+                        
+                        if(!finalProjId && !id) return alert('Selecciona un proyecto');
+
+                        const tData = {
+                            titulo: titulo,
+                            descripcion: document.getElementById('t-desc').value,
+                            contenido_doc: document.getElementById('t-doc').value,
+                            estado: document.getElementById('t-estado').value,
+                            fecha_limite: document.getElementById('t-fecha').value || null,
+                            prioridad: document.querySelector('input[name="prioridad"]:checked').value,
+                            proyecto_id: id ? state.allTasks.find(x => x.id == id).proyecto_id : finalProjId
+                        };
+
+                        // Optimistic Update
+                        if(id) {
+                            // Update existing
+                            const idx = state.allTasks.findIndex(x => x.id == id);
+                            if(idx !== -1) state.allTasks[idx] = { ...state.allTasks[idx], ...tData };
+                            await db.from('tareas').update(tData).eq('id', id);
+                        } else {
+                            // Create
+                            const { data, error } = await db.from('tareas').insert([tData]).select().single();
+                            if(data) state.allTasks.push(data);
+                        }
+
+                        window.app.ui.closeModal('modal-task');
+                        window.app.actions.refreshView();
+                    },
+
+                    deleteTask: async () => {
+                        const id = document.getElementById('t-id').value;
+                        if(!confirm('¿Eliminar tarea permanentemente?')) return;
+                        
+                        state.allTasks = state.allTasks.filter(t => t.id != id); // Optimistic
+                        window.app.ui.closeModal('modal-task');
+                        window.app.actions.refreshView();
+                        await db.from('tareas').delete().eq('id', id);
+                    },
+
+                    dropTask: async (e, newStatus) => {
+                        e.preventDefault();
+                        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                        const id = e.dataTransfer.getData('text');
+                        if(!id) return;
+
+                        const t = state.allTasks.find(x => x.id == id);
+                        if(t && t.estado !== newStatus) {
+                            t.estado = newStatus;
+                            window.app.actions.refreshView();
+                            await db.from('tareas').update({estado: newStatus}).eq('id', id);
+                        }
+                    },
+
+                    // Project Actions
+                    prepProjectModal: (isEdit) => {
+                        const delBtn = document.getElementById('btn-delete-project');
+                        const form = document.querySelector('#modal-project form');
+                        form.reset();
+                        
+                        if(isEdit && state.activeProjectId) {
+                            const p = state.projects.find(x => x.id == state.activeProjectId);
+                            document.getElementById('project-modal-title').textContent = 'Editar Proyecto';
+                            document.getElementById('p-id').value = p.id;
+                            document.getElementById('p-nombre').value = p.nombre;
+                            document.getElementById('p-desc').value = p.descripcion || '';
+                            document.getElementById('p-color').value = p.color_hex || '#0ea5e9';
+                            delBtn.classList.remove('hidden');
+                        } else {
+                            document.getElementById('project-modal-title').textContent = 'Nuevo Proyecto';
+                            document.getElementById('p-id').value = '';
+                            document.getElementById('p-color').value = '#0ea5e9';
+                            delBtn.classList.add('hidden');
+                        }
+                    },
+
+                    saveProject: async (e) => {
+                        e.preventDefault();
+                        const fd = new FormData(e.target);
+                        const pData = {
+                            nombre: fd.get('nombre'),
+                            descripcion: fd.get('descripcion'),
+                            color_hex: fd.get('color_hex')
+                        };
+                        const id = fd.get('id');
+
+                        if(id) {
+                            const idx = state.projects.findIndex(x => x.id == id);
+                            if(idx !== -1) state.projects[idx] = { ...state.projects[idx], ...pData };
+                            await db.from('proyectos').update(pData).eq('id', id);
+                        } else {
+                            const { data } = await db.from('proyectos').insert([pData]).select().single();
+                            if(data) {
+                                state.projects.push(data);
+                                state.activeProjectId = data.id; // Switch to new
+                                state.currentView = 'project';
+                            }
+                        }
+                        
+                        window.app.ui.closeModal('modal-project');
+                        window.app.render.sidebar();
+                        if(state.currentView === 'dashboard') window.app.render.dashboard();
+                        else window.app.render.projectWorkspace();
+                    },
+
+                    deleteProject: async () => {
+                        if(!confirm('¿Eliminar proyecto y TODAS sus tareas?')) return;
+                        const id = state.activeProjectId;
+                        
+                        // Local cleanup
+                        state.projects = state.projects.filter(p => p.id != id);
+                        state.allTasks = state.allTasks.filter(t => t.proyecto_id != id);
+                        
+                        window.app.ui.closeModal('modal-project');
+                        window.app.router.goHome();
+                        
+                        await db.from('proyectos').delete().eq('id', id);
+                    },
+
+                    refreshView: () => {
+                        if(state.currentView === 'dashboard') window.app.render.dashboard();
+                        else window.app.render.projectWorkspace();
+                    }
+                }
+            };
+
+            // Init App
+            window.app.actions.init();
+        });
+    </script>
+</body>
+</html>
