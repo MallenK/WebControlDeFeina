@@ -342,24 +342,55 @@
                     sidebar: () => {
                         const list = document.getElementById('project-list');
                         list.innerHTML = '';
-                        state.projects.forEach(p => {
+
+                        // Orden: primero pinned, luego alfabético
+                        const orderedProjects = [...state.projects]
+                            .sort((a, b) => {
+                                if (a.pinned === b.pinned) {
+                                    return a.nombre.localeCompare(b.nombre);
+                                }
+                                return b.pinned - a.pinned; // true primero
+                            });
+
+                        orderedProjects.forEach(p => {
                             const isActive = state.activeProjectId === p.id;
+
                             const li = document.createElement('li');
-                            li.className = `group flex items-center gap-3 px-3 py-2 rounded-lg text-sm cursor-pointer mx-2 transition-all ${isActive ? 'bg-brand-50 text-brand-700 font-medium border border-brand-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`;
-                            li.onclick = () => window.app.router.goToProject(p.id);
-                            li.innerHTML = `<div class="w-2.5 h-2.5 rounded-full" style="background-color: ${p.color_hex || '#cbd5e1'}"></div>
-                                            <span class="truncate flex-1">${p.nombre}</span>
-                                            ${isActive ? '<i data-lucide="chevron-right" class="w-4 h-4 text-brand-400"></i>' : ''}`;
+                            li.className = `
+                                group flex items-center gap-3 px-3 py-2 rounded-lg text-sm cursor-pointer mx-2 transition-all
+                                ${isActive
+                                    ? 'bg-brand-50 text-brand-700 font-medium border border-brand-100'
+                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                            `;
+
+                            li.onclick = (e) => {
+                                if (e.target.closest('.pin-btn')) return;
+                                window.app.router.goToProject(p.id);
+                            };
+
+                            li.innerHTML = `
+                                <div class="w-2.5 h-2.5 rounded-full" style="background-color: ${p.color_hex || '#cbd5e1'}"></div>
+                                <span class="truncate flex-1">${p.nombre}</span>
+
+                                <button class="pin-btn opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onclick="event.stopPropagation(); window.app.actions.togglePin('${p.id}')">
+                                    <i data-lucide="${p.pinned ? 'pin-off' : 'pin'}" 
+                                    class="w-4 h-4 ${p.pinned ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'}"></i>
+                                </button>
+
+                                ${isActive ? '<i data-lucide="chevron-right" class="w-4 h-4 text-brand-400"></i>' : ''}
+                            `;
+
                             list.appendChild(li);
                         });
-                        
-                        // Highlight Dashboard Link
+
                         const dashLink = document.getElementById('nav-dashboard');
                         if(state.currentView === 'dashboard') {
                             dashLink.classList.add('bg-slate-100', 'text-brand-600');
                         } else {
                             dashLink.classList.remove('bg-slate-100', 'text-brand-600');
                         }
+
                         lucide.createIcons();
                     },
 
@@ -738,6 +769,28 @@
                         const searchInput = document.querySelector('input[placeholder="Buscar..."]');
                         if(searchInput) searchInput.value = '';
                         window.app.render.dashboard();
+                    },
+
+                    togglePin: async (id) => {
+                        const project = state.projects.find(p => p.id == id);
+                        if (!project) return;
+
+                        const newValue = !project.pinned;
+
+                        // Optimista
+                        project.pinned = newValue;
+                        window.app.render.sidebar();
+
+                        const { error } = await db
+                            .from('proyectos')
+                            .update({ pinned: newValue })
+                            .eq('id', id);
+
+                        if (error) {
+                            project.pinned = !newValue; // revertir
+                            window.app.render.sidebar();
+                            alert('No se pudo actualizar el pin.');
+                        }
                     },
 
                     // Task Modal Logic
